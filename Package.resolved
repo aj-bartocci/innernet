@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "InnernetBase",
+        "repositoryURL": "https://github.com/aj-bartocci/innernet-base",
+        "state": {
+          "branch": null,
+          "revision": "fdb48835762cc5bf71475b94dd1499b85bbdb972",
+          "version": "0.0.1"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
