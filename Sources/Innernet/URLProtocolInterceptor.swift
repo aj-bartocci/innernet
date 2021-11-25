@@ -25,9 +25,9 @@ extension NetworkError {
 
 // Swizzling URLSession will also not work because Alamofire uses URLConnection under the hood?
 
-private let HandledKey = "URLProtocolInterceptorHandledKey"
+let HandledKey = "URLProtocolInterceptorHandledKey"
 
-private extension DispatchQueue {
+extension DispatchQueue {
     static let intercept = DispatchQueue(label: "com.ajbartocci.Innernet.URLProtocolInterceptorQueue")
 }
 
@@ -40,6 +40,11 @@ public class URLProtocolInterceptor: URLProtocol {
     public override class func canInit(with request: URLRequest) -> Bool {
         if URLProtocol.property(forKey: HandledKey, in: request) != nil {
           return false
+        }
+        if ConsoleManager.shared.isLoadingIntercepts {
+            let newRequest = ((request as NSURLRequest).mutableCopy() as! NSMutableURLRequest)
+            URLProtocol.setProperty(true, forKey: HandledKey, in: newRequest)
+            return true
         }
         if interceptor.intercept(for: request) != nil {
             return true
@@ -63,6 +68,18 @@ public class URLProtocolInterceptor: URLProtocol {
     }
     
     public override func startLoading() {
+        DispatchQueue.intercept.async {
+            if ConsoleManager.shared.isLoadingIntercepts {
+                ConsoleManager.shared.onInterceptsFinishedLoading { [weak self] in
+                    self?.startRequest()
+                }
+            } else {
+                self.startRequest()
+            }
+        }
+    }
+    
+    private func startRequest() {
         if let intercept = URLProtocolInterceptor.interceptor.intercept(for: request) {
             handleIntercept(intercept, for: request)
         } else {
@@ -145,6 +162,17 @@ private extension URLProtocolInterceptor {
                     let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: httpVersion, headerFields: headers)!
                     self.receivedResponse(response)
                     self.didFinishRequest()
+                case let .redirected(data, response, error):
+                    if let response = response {
+                        self.receivedResponse(response)
+                    }
+                    if let data = data {
+                        self.receivedData(data)
+                        self.didFinishRequest()
+                    } else {
+                        self.receivedError(error!)
+                        self.didFinishRequest()
+                    }
                 case let .networkError(networkError):
                     self.receivedError(networkError.errorForResponse)
                     self.didFinishRequest()

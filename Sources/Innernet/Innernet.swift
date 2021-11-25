@@ -16,6 +16,8 @@ public class Innernet {
             URLProtocolInterceptor.timeoutThreshold = timeoutThreshold
         }
     }
+    
+    static var enableExternalConsoleIntercepts: Bool = false
 }
 
 public extension Innernet {
@@ -52,6 +54,71 @@ public extension Innernet {
     
     static func unregisterAll() {
         URLProtocolInterceptor.interceptor.unregisterAll()
+    }
+    
+    static func enableExternalConsole() {
+        Self.enableExternalConsoleIntercepts = true
+        ConsoleManager.shared.loadIntercepts { result in
+            handleConsoleInterceptResponse(result: result)
+        }
+    }
+    
+    static func disableExternalConsole() {
+        Self.enableExternalConsoleIntercepts = false
+    }
+}
+
+private extension Innernet {
+    
+    static func handleConsoleInterceptResponse(result: Result<Network.Response<[ConsoleManager.ConsoleIntercept]>, Error>) {
+        switch result {
+        case .success(let response):
+            handleConsoleIntercepts(response.payload)
+        case .failure(let error):
+            handleConsoleError(error)
+        }
+    }
+    
+    static func handleConsoleIntercepts(_ intercepts: [ConsoleManager.ConsoleIntercept]) {
+        intercepts.forEach { intercept in
+            registerExternalIntercept(
+                RequestInterceptor.HTTPMethod.custom(intercept.method),
+                matching: intercept.matchURL,
+                onRequest: { _, completion in
+                    // hit the localhost to get the payload info for mock
+                    ConsoleManager.shared.loadMockInfoFor(
+                        intercept: intercept,
+                        completion: { data, response, error in
+                            // TODO: try to decode the data as some predefined console object
+                            // so that network timeouts and stuff can be sent instead of simply
+                            // the mocked response
+                            completion(.redirected(data: data, response: response, error: error))
+                        }
+                    )
+                }
+            )
+        }
+    }
+    
+    static func handleConsoleError(_ error: Error) {
+        print("console error = \(error)")
+    }
+    
+    static func registerExternalIntercept(
+        _ method: RequestInterceptor.HTTPMethod,
+        matching url: String,
+        onRequest: @escaping (URLRequest, @escaping (ResponseStrategy) -> Void) -> Void
+    ) {
+        URLProtocolInterceptor.interceptor.register(
+            method,
+            canIntercept: { req in
+                if Self.enableExternalConsoleIntercepts == false {
+                    return false
+                }
+                return RequestInterceptor.defaultMatching(for: req, matching: url)
+            },
+            onRequest: onRequest
+        )
     }
 }
 #endif
