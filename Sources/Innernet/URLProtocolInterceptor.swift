@@ -177,9 +177,12 @@ private extension URLProtocolInterceptor {
     
     
     func forwardOriginalRequest(request: URLRequest) {
+        // Since the request gets modified after it has been sent
+        // create a local copy for logging purposes
+        let requestCopy = request
         Network.shared.send(request: request) { [weak self] data, response, error in
             ConsoleManager.shared.logRequest(
-                request,
+                requestCopy,
                 resData: data,
                 response: response,
                 error: error,
