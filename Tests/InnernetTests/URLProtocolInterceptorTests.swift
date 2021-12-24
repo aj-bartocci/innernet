@@ -92,7 +92,7 @@ final class URLProtocolInterceptorTests: XCTestCase {
     func test_RequestHitsNetwork_When_NoMatchingIntercept_And_PassthroughsEnabled() {
         URLProtocolInterceptor.allowsPassthroughRequests = true
         let config = URLSessionConfiguration.default
-        config.protocolClasses = [Innernet.InterceptProtocol.self, MockURLProtocol.self]
+        config.protocolClasses = [MockURLProtocol.self]
         session = URLSession(configuration: config)
 
         let expect = expectation(description: "test_RequestHitsNetwork_When_NoMatchingIntercept_And_PassthroughsEnabled")

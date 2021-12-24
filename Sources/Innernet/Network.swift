@@ -1,15 +1,14 @@
-//
-//  File.swift
-//  
-//
-//  Created by AJ Bartocci on 11/24/21.
-//
-
+#if DEBUG
 import Foundation
+
+protocol RequestRepresentable {
+    associatedtype Payload
+    var request: URLRequest { get }
+}
 
 class Network {
     
-    struct Request<Payload> {
+    struct Request<Payload>: RequestRepresentable {
         let request: URLRequest
     }
     
@@ -18,19 +17,21 @@ class Network {
         let response: HTTPURLResponse
     }
     
+    struct EmptyPayload: Codable { }
+    
     static let shared = Network()
     init() { }
     
-    func send<T: Decodable>(
-        request: Request<T>,
+    func send<Request: RequestRepresentable>(
+        request: Request,
         decoder: JSONDecoder = JSONDecoder(),
-        completion: @escaping (Result<Response<T>, Error>) -> Void
+        completion: @escaping (Result<Response<Request.Payload>, Error>) -> Void
     ) {
-        send(request: Request(request: request.request)) { result in
+        send(request: request.request) { result in
             switch result {
             case .success(let response):
                 do {
-                    let payload = try decoder.decode(T.self, from: response.payload)
+                    let payload = try decoder.decode(Request.Payload.self, from: response.payload)
                     completion(.success(Response(payload: payload, response: response.response)))
                 } catch {
                     completion(.failure(error))
@@ -42,12 +43,12 @@ class Network {
     }
     
     func send(
-        request: Request<Data>,
+        request: URLRequest,
         completion: @escaping (Result<Response<Data>, Error>) -> Void
     ) {
-        let req = ((request.request as NSURLRequest).mutableCopy() as! NSMutableURLRequest)
+        let req = ((request as NSURLRequest).mutableCopy() as! NSMutableURLRequest)
         URLProtocol.setProperty(true, forKey: HandledKey, in: req)
-        send(request: request.request) { data, response, error in
+        send(request: request) { data, response, error in
             guard let data = data, let response = response as? HTTPURLResponse else {
                 completion(.failure(error!))
                 return
@@ -65,3 +66,4 @@ class Network {
         URLSession.shared.dataTask(with: req as URLRequest, completionHandler: completion).resume()
     }
 }
+#endif

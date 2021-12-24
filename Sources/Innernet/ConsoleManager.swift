@@ -1,17 +1,5 @@
-//
-//  File.swift
-//  
-//
-//  Created by AJ Bartocci on 11/24/21.
-//
-
+#if DEBUG
 import Foundation
-
-// TODO: make it so the user can set the port
-// - Innernet client will have it as an option that is passed on startup
-// - Innernet console will have settings page where it can be set
-private let consoleBaseUrlString = "http://localhost:5069"
-private let consoleBaseUrl = URL(string: consoleBaseUrlString)!
 
 class ConsoleManager {
     
@@ -25,6 +13,17 @@ class ConsoleManager {
         let method: String
         let matchURL: String
         let delay: Double
+    }
+    
+    struct LoggedRequest: Codable {
+        let statusCode: Int
+        let method: String
+        let url: String
+        let reqHeaders: [String: String]?
+        let reqBody: Data?
+        let resBody: Data?
+        let resHeaders: [String: String]?
+        let wasIntercepted: Bool
     }
     
     // TODO: allow console configured networking errors
@@ -53,11 +52,11 @@ class ConsoleManager {
     var interceptsLoadingCompletions = [() -> Void]()
     static let shared = ConsoleManager()
     
-    private init() { }
+    init() { }
     
     func loadIntercepts(completion: @escaping (Result<Network.Response<[ConsoleIntercept]>, Error>) -> Void) {
         isLoadingIntercepts = true
-        let url = consoleBaseUrl.appendingPathComponent("intercept")
+        let url = Constant.Network.consoleBaseUrl.appendingPathComponent("intercept")
         Network.shared.send(
             request: Request.Intercepts(request: URLRequest(url: url)),
             completion: { [weak self] result in
@@ -73,7 +72,7 @@ class ConsoleManager {
         intercept: ConsoleIntercept,
         completion: @escaping (Data?, URLResponse?, Error?) -> Void
     ) {
-        let url = consoleBaseUrl.appendingPathComponent("intercept/\(intercept.id)/response")
+        let url = Constant.Network.consoleBaseUrl.appendingPathComponent("intercept/\(intercept.id)/response")
         Network.shared.send(request: URLRequest(url: url), completion: completion)
     }
     
@@ -86,4 +85,36 @@ class ConsoleManager {
             self.interceptsLoadingCompletions.append(completion)
         }
     }
+    
+    func logRequest(
+        _ request: URLRequest,
+        resData: Data?,
+        response: URLResponse?,
+        error: Error?,
+        wasIntercepted: Bool,
+        completion: (() -> Void)? = nil
+    ) {
+        let response = response as? HTTPURLResponse
+        let payload = LoggedRequest(
+            statusCode: response?.statusCode ?? -1,
+            method: request.httpMethod ?? "???",
+            url: request.url?.absoluteString ?? "???",
+            reqHeaders: request.allHTTPHeaderFields,
+            reqBody: request.httpBody,
+            resBody: resData,
+            resHeaders: response?.allHeaderFields as? [String: String],
+            wasIntercepted: wasIntercepted
+        )
+        let req = Request.LogRequest(payload)
+        Network.shared.send(request: req) { result in
+            switch result {
+            case .success:
+                break
+            case .failure(let error):
+                Logger.shared.error(error.localizedDescription)
+            }
+            completion?()
+        }
+    }
 }
+#endif

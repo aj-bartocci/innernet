@@ -46,17 +46,7 @@ public class URLProtocolInterceptor: URLProtocol {
             URLProtocol.setProperty(true, forKey: HandledKey, in: newRequest)
             return true
         }
-        if interceptor.intercept(for: request) != nil {
-            return true
-        } else {
-            if allowsPassthroughRequests {
-                // allow it to go on to the network
-                return false
-            } else {
-                // intercept it and return an error
-                return true
-            }
-        }
+        return true
     }
     
     public override class func requestIsCacheEquivalent(_ a: URLRequest, to b: URLRequest) -> Bool {
@@ -155,6 +145,7 @@ private extension URLProtocolInterceptor {
                 didFinish = true
                 switch response {
                 case let .mock(status: status, data: data, headers: headers, httpVersion: httpVersion):
+                    // TODO: log this to the external console
                     if let data = data {
                         self.receivedData(data)
                     }
@@ -163,6 +154,7 @@ private extension URLProtocolInterceptor {
                     self.receivedResponse(response)
                     self.didFinishRequest()
                 case let .redirected(data, response, error):
+                    // TODO: log this to the external console
                     if let response = response {
                         self.receivedResponse(response)
                     }
@@ -174,6 +166,7 @@ private extension URLProtocolInterceptor {
                         self.didFinishRequest()
                     }
                 case let .networkError(networkError):
+                    // TODO: log this to the external console 
                     self.receivedError(networkError.errorForResponse)
                     self.didFinishRequest()
                 }
@@ -184,10 +177,14 @@ private extension URLProtocolInterceptor {
     
     
     func forwardOriginalRequest(request: URLRequest) {
-        let newRequest = ((request as NSURLRequest).mutableCopy() as! NSMutableURLRequest)
-        URLProtocol.setProperty(true, forKey: HandledKey, in: newRequest)
-        
-        URLSession.shared.dataTask(with: newRequest as URLRequest) { [weak self] data, response, error in
+        Network.shared.send(request: request) { [weak self] data, response, error in
+            ConsoleManager.shared.logRequest(
+                request,
+                resData: data,
+                response: response,
+                error: error,
+                wasIntercepted: false
+            )
             if let data = data, let response = response {
                 self?.receivedData(data)
                 self?.receivedResponse(response)
@@ -199,7 +196,24 @@ private extension URLProtocolInterceptor {
                 self?.receivedError(error!)
                 self?.didFinishRequest()
             }
-        }.resume()
+        }
+//        let newRequest = ((request as NSURLRequest).mutableCopy() as! NSMutableURLRequest)
+//        URLProtocol.setProperty(true, forKey: HandledKey, in: newRequest)
+//
+//        URLSession.shared.dataTask(with: newRequest as URLRequest) { [weak self] data, response, error in
+//            // TODO: log this to the external console
+//            if let data = data, let response = response {
+//                self?.receivedData(data)
+//                self?.receivedResponse(response)
+//                self?.didFinishRequest()
+//            } else {
+//                if let response = response {
+//                    self?.receivedResponse(response)
+//                }
+//                self?.receivedError(error!)
+//                self?.didFinishRequest()
+//            }
+//        }.resume()
     }
 }
 #endif

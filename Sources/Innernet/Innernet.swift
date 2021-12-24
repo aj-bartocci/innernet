@@ -17,7 +17,18 @@ public class Innernet {
         }
     }
     
+    /// Enable or disable communication with external console. Defaults to false.
     static var enableExternalConsoleIntercepts: Bool = false
+    
+    /// Enable or disable logging. Defaults to false.
+    static var enableLogs: Bool {
+        get {
+            return Logger.shared.isEnabled
+        }
+        set {
+            Logger.shared.isEnabled = newValue
+        }
+    }
 }
 
 public extension Innernet {
@@ -56,6 +67,7 @@ public extension Innernet {
         URLProtocolInterceptor.interceptor.unregisterAll()
     }
     
+    /// Enable  communication with external console. Defaults to false.
     static func enableExternalConsole() {
         Self.enableExternalConsoleIntercepts = true
         ConsoleManager.shared.loadIntercepts { result in
@@ -65,6 +77,15 @@ public extension Innernet {
     
     static func disableExternalConsole() {
         Self.enableExternalConsoleIntercepts = false
+    }
+    
+    /// Enable logging. Defaults to false.
+    static func enableLogging() {
+        Self.enableLogs = true
+    }
+    
+    static func disableLogging() {
+        Self.enableLogs = false
     }
 }
 
@@ -101,7 +122,7 @@ private extension Innernet {
     }
     
     static func handleConsoleError(_ error: Error) {
-        print("console error = \(error)")
+        Logger.shared.error(error.localizedDescription)
     }
     
     static func registerExternalIntercept(
